@@ -4,6 +4,6 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="9.0.9"/>
-    <PackageVersion Include="Aspire.Hosting.AppHost" Version="9.4.2"/>
+    <PackageVersion Include="Aspire.Hosting.AppHost" Version="9.5.0"/>
   </ItemGroup>
 </Project>
