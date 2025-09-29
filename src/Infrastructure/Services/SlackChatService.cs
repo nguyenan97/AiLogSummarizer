@@ -1,5 +1,6 @@
 using Application.Interfaces;
 using SlackNet;
+using SlackNet.WebApi;
 
 namespace Infrastructure.Services;
 
@@ -14,7 +15,13 @@ public class SlackChatService : ISlackChatService
 
     public async Task SendMessageAsync(string channel, string message, string? threadTs = null)
     {
-        // TODO: Implement sending message to Slack
-        await Task.CompletedTask;
+        var msg = new Message
+        {
+            Channel = channel,
+            Text = message,
+            ThreadTs = threadTs
+        };
+
+        await _slackApiClient.Chat.PostMessage(msg);
     }
 }

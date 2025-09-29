@@ -1,5 +1,7 @@
 using Application;
 using Infrastructure;
+using Microsoft.Extensions.Options;
+using SlackNet.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,7 +24,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "My API v1");
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "v1");
         c.RoutePrefix = string.Empty;
     });
 }
@@ -32,6 +34,9 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Slack events endpoint (default route prefix: /slack)
+app.UseSlackNet();
 
 app.MapHealthChecks("/health");
 

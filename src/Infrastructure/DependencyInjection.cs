@@ -8,6 +8,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Application.Interfaces;
 using SlackNet.AspNetCore;
+using SlackNet.Events;
+using Infrastructure.Slack;
+using SlackNet.Extensions.DependencyInjection;
 
 namespace Infrastructure;
 
@@ -25,8 +28,18 @@ public static class DependencyInjection
 
         services.AddScoped<IDateTimeService, DateTimeService>();
 
-        // Slack services
-        services.AddSlackNet(c => c.UseApiToken(configuration["Slack:BotToken"]));
+        // SlackNet: tokens + signing secret + event handlers
+        services.AddSlackNet(c =>
+        {
+            c.UseApiToken(configuration["Slack:BotToken"]!);
+            c.UseSigningSecret(configuration["Slack:SigningSecret"]!);
+            c.RegisterEventHandler<AppMention>(ctx => ctx.ServiceProvider().GetRequiredService<AppMentionEventHandler>());
+        });
+
+        // AppMention handler DI
+        services.AddScoped<AppMentionEventHandler>();
+
+        // Slack chat service (SlackNet added in WebApi)
         services.AddScoped<ISlackChatService, SlackChatService>();
 
         // Other services
