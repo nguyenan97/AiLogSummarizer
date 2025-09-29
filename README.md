@@ -54,7 +54,7 @@ Central package management and analyzer settings are configured via `Directory.P
 ### Setting Local Environment
 
 - Configure database connection:
-  - Update `src/WebApi/appsettings.json:1` `ConnectionStrings:DefaultConnection`, or
+  - Update `src/WebApi/appsettings.json` `ConnectionStrings:DefaultConnection`, or
   - Set environment variable `ConnectionStrings__DefaultConnection="<your-connection-string>"`.
 - Restore and build:
   - `dotnet restore`
@@ -119,7 +119,8 @@ Central package management and analyzer settings are configured via `Directory.P
 
 ## 🛠️ CI/CD Pipelines
 
+- CI/CD pipelines are defined in ./github/ folder
 - GitHub Actions workflow builds pull requests on `main` (`.github/workflows/build-pull-request.yml`).
   - Sets up .NET 9, restores, and builds in Release.
-- No release publishing pipeline is defined in-repo; add as needed.
+
 
