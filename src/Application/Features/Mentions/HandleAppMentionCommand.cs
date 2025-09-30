@@ -1,3 +1,7 @@
+﻿using System;
+using System.Globalization;
+using System.Threading;
+using System.Threading.Tasks;
 using Application.Interfaces;
 using Domain.Shared;
 using MediatR;
@@ -8,6 +12,8 @@ public record HandleAppMentionCommand(string Text, string Channel, string Thread
 
 public class HandleAppMentionCommandHandler : IRequestHandler<HandleAppMentionCommand>
 {
+    private static readonly CultureInfo ParserCulture = CultureInfo.InvariantCulture;
+
     private readonly ISlackChatService _slackChatService;
     private readonly IMentionParserService _mentionParserService;
     private readonly ILogSourceService _logSourceService;
@@ -34,28 +40,68 @@ public class HandleAppMentionCommandHandler : IRequestHandler<HandleAppMentionCo
 
         try
         {
-            // 2) Parse the mention text (mock for now)
-            var parseResult = await _mentionParserService.ParseMentionAsync(request.Text);
+            var parseResult = await _mentionParserService.ParseMentionAsync(request.Text, cancellationToken);
 
-            if (!parseResult.IsValid)
+            if (!parseResult.Success)
             {
-                var suggestion = parseResult.ErrorMessage ?? "Cú pháp chưa đúng. Ví dụ: `@bot summarize last 15m from datadog`";
+                var suggestion = !string.IsNullOrWhiteSpace(parseResult.Suggestion)
+                    ? parseResult.Suggestion
+                    : "Cu phap chua dung. Vi du: @OopsAI Summarize last 2 hours";
+
                 await _slackChatService.SendMessageAsync(request.Channel, suggestion, request.ThreadTs);
                 return;
             }
 
-            // 3) Fetch logs/trace from source (mock Datadog)
-            IEnumerable<TraceLog> logs = await _logSourceService.GetLogsAsync(parseResult.TimeRange, parseResult.Source);
+            if (!Enum.TryParse(parseResult.Intent, true, out IntentType intent))
+            {
+                await _slackChatService.SendMessageAsync(
+                    request.Channel,
+                    $"Intent '{parseResult.Intent}' chua duoc ho tro.",
+                    request.ThreadTs);
+                return;
+            }
 
-            // 4) Summarize (mock AI)
-            var summary = await _summarizerService.SummarizeAsync(logs, parseResult.OutputType);
+            if (parseResult.Range is null ||
+                string.IsNullOrWhiteSpace(parseResult.Range.Start) ||
+                string.IsNullOrWhiteSpace(parseResult.Range.End))
+            {
+                var message = parseResult.Suggestion ?? "Khong tim thay khoang thoi gian hop le. Thu lai voi thoi gian cu the.";
+                await _slackChatService.SendMessageAsync(request.Channel, message, request.ThreadTs);
+                return;
+            }
 
-            // 5) Reply with the summarized result in the same thread
+            if (!DateTimeOffset.TryParse(parseResult.Range.Start, ParserCulture, DateTimeStyles.RoundtripKind, out var start) ||
+                !DateTimeOffset.TryParse(parseResult.Range.End, ParserCulture, DateTimeStyles.RoundtripKind, out var end))
+            {
+                await _slackChatService.SendMessageAsync(
+                    request.Channel,
+                    "Khong the doc du lieu thoi gian. Vui long thu lai sau.",
+                    request.ThreadTs);
+                return;
+            }
+
+            if (end <= start)
+            {
+                var message = parseResult.Suggestion ?? "Khoang thoi gian khong hop le. Vi du: @OopsAI Analyze from 8h to 10h";
+                await _slackChatService.SendMessageAsync(request.Channel, message, request.ThreadTs);
+                return;
+            }
+
+            if (!Enum.TryParse(parseResult.Source, true, out SourceType source))
+            {
+                source = SourceType.Datadog;
+            }
+
+            var timeRange = new TimeRange(start, end);
+
+            var logs = await _logSourceService.GetLogsAsync(timeRange, source);
+
+            var summary = await _summarizerService.SummarizeAsync(logs, DesiredOutputType.Text);
+
             await _slackChatService.SendMessageAsync(request.Channel, summary, request.ThreadTs);
         }
         catch
         {
-            // 6) Unexpected error fallback
             await _slackChatService.SendMessageAsync(
                 request.Channel,
                 "An unexpected error occurred. Please try again later.",
@@ -63,4 +109,3 @@ public class HandleAppMentionCommandHandler : IRequestHandler<HandleAppMentionCo
         }
     }
 }
-

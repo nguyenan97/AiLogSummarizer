@@ -1,15 +1,20 @@
+using System;
 using Application.Common.Interfaces;
+using Application.Interfaces;
+using Azure;
+using Azure.AI.OpenAI;
 using Domain.Interfaces;
+using Infrastructure.Options;
 using Infrastructure.Persistence;
 using Infrastructure.Repositories;
 using Infrastructure.Services;
+using Infrastructure.Slack;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Application.Interfaces;
+using Microsoft.Extensions.Options;
 using SlackNet.AspNetCore;
 using SlackNet.Events;
-using Infrastructure.Slack;
 using SlackNet.Extensions.DependencyInjection;
 
 namespace Infrastructure;
@@ -27,6 +32,17 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         services.AddScoped<IDateTimeService, DateTimeService>();
+
+        services.AddOptions<AzureOpenAIOptions>()
+            .Bind(configuration.GetSection("OpenAI"))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddSingleton(sp =>
+        {
+            var options = sp.GetRequiredService<IOptions<AzureOpenAIOptions>>().Value;
+            return new AzureOpenAIClient(new Uri(options.Endpoint), new AzureKeyCredential(options.ApiKey));
+        });
 
         // SlackNet: tokens + signing secret + event handlers
         services.AddSlackNet(c =>
@@ -50,3 +66,4 @@ public static class DependencyInjection
         return services;
     }
 }
+

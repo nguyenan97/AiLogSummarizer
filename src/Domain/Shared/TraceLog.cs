@@ -1,3 +1,3 @@
 namespace Domain.Shared;
 
-public record TraceLog(DateTime Timestamp, string Message, string Level, string Source);
+public record TraceLog(DateTimeOffset Timestamp, string Message, string Level, string Source);

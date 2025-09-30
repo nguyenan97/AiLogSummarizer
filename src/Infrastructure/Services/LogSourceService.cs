@@ -7,10 +7,11 @@ public class LogSourceService : ILogSourceService
 {
     public Task<IEnumerable<TraceLog>> GetLogsAsync(TimeRange timeRange, SourceType source)
     {
-        // TODO: Implement fetching logs from source
-        return Task.FromResult<IEnumerable<TraceLog>>(new List<TraceLog>
+        var logs = new List<TraceLog>
         {
-            new TraceLog(DateTime.Now, "Sample log message", "INFO", "Datadog")
-        });
+            new(DateTimeOffset.UtcNow, "Sample log message", "INFO", source.ToString())
+        };
+
+        return Task.FromResult<IEnumerable<TraceLog>>(logs);
     }
 }
