@@ -35,7 +35,7 @@ public class HandleAppMentionCommandHandler : IRequestHandler<HandleAppMentionCo
     {
         await _slackChatService.SendMessageAsync(
             request.Channel,
-            "Đã nhận yêu cầu — đang xử lý…",
+            "Request received — processing…",
             request.ThreadTs);
 
         try
@@ -46,7 +46,7 @@ public class HandleAppMentionCommandHandler : IRequestHandler<HandleAppMentionCo
             {
                 var suggestion = !string.IsNullOrWhiteSpace(parseResult.Suggestion)
                     ? parseResult.Suggestion
-                    : "Cu phap chua dung. Vi du: @OopsAI Summarize last 2 hours";
+                    : "Invalid syntax. Example: @OopsAI Summarize last 2 hours";
 
                 await _slackChatService.SendMessageAsync(request.Channel, suggestion, request.ThreadTs);
                 return;
@@ -56,7 +56,7 @@ public class HandleAppMentionCommandHandler : IRequestHandler<HandleAppMentionCo
             {
                 await _slackChatService.SendMessageAsync(
                     request.Channel,
-                    $"Intent '{parseResult.Intent}' chua duoc ho tro.",
+                    $"Intent '{parseResult.Intent}' is not supported.",
                     request.ThreadTs);
                 return;
             }
@@ -65,7 +65,7 @@ public class HandleAppMentionCommandHandler : IRequestHandler<HandleAppMentionCo
                 string.IsNullOrWhiteSpace(parseResult.Range.Start) ||
                 string.IsNullOrWhiteSpace(parseResult.Range.End))
             {
-                var message = parseResult.Suggestion ?? "Khong tim thay khoang thoi gian hop le. Thu lai voi thoi gian cu the.";
+                var message = parseResult.Suggestion ?? "No valid time range found. Try again with a specific time.";
                 await _slackChatService.SendMessageAsync(request.Channel, message, request.ThreadTs);
                 return;
             }
@@ -75,14 +75,14 @@ public class HandleAppMentionCommandHandler : IRequestHandler<HandleAppMentionCo
             {
                 await _slackChatService.SendMessageAsync(
                     request.Channel,
-                    "Khong the doc du lieu thoi gian. Vui long thu lai sau.",
+                    "Unable to parse time data. Please try again later.",
                     request.ThreadTs);
                 return;
             }
 
             if (end <= start)
             {
-                var message = parseResult.Suggestion ?? "Khoang thoi gian khong hop le. Vi du: @OopsAI Analyze from 8h to 10h";
+                var message = parseResult.Suggestion ?? "Invalid time range. Example: @OopsAI Analyze from 8 AM to 10 AM";
                 await _slackChatService.SendMessageAsync(request.Channel, message, request.ThreadTs);
                 return;
             }
