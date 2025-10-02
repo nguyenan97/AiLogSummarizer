@@ -4,11 +4,15 @@ using Application.Interfaces;
 using Azure;
 using Azure.AI.OpenAI;
 using Domain.Interfaces;
+using Domain.Models;
+using Domain.Shared;
 using Infrastructure.Options;
 using Infrastructure.Persistence;
 using Infrastructure.Repositories;
 using Infrastructure.Services;
+using Infrastructure.Services.LogSources;
 using Infrastructure.Slack;
+using LogReader.Services.Sources;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -37,6 +41,9 @@ public static class DependencyInjection
             .Bind(configuration.GetSection("OpenAI"))
             .ValidateDataAnnotations()
             .ValidateOnStart();
+        services.AddOptions<DatadogSettings>().Bind(configuration.GetSection("Datadog"));
+        services.AddOptions<LogFolderSettings>().Bind(configuration.GetSection("LogFolder"));
+
 
         services.AddSingleton(sp =>
         {
@@ -60,8 +67,10 @@ public static class DependencyInjection
 
         // Other services
         services.AddScoped<IMentionParserService, MentionParserService>();
-        services.AddScoped<ILogSourceService, LogSourceService>();
         services.AddScoped<ISummarizerService, SummarizerService>();
+        services.AddKeyedSingleton<ILogSourceService, DatadogLogSource>(SourceType.Datadog);
+        services.AddKeyedSingleton<ILogSourceService, FolderLogSource>(SourceType.Folder);
+        services.AddSingleton<ICompositeLogSource, CompositeLogSource>();
 
         return services;
     }

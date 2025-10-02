@@ -1,0 +1,6 @@
+@FakeDatadogApi_HostAddress = http://localhost:5086
+
+GET {{FakeDatadogApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

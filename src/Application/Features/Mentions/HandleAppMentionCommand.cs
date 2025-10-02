@@ -16,18 +16,18 @@ public class HandleAppMentionCommandHandler : IRequestHandler<HandleAppMentionCo
 
     private readonly ISlackChatService _slackChatService;
     private readonly IMentionParserService _mentionParserService;
-    private readonly ILogSourceService _logSourceService;
+    private readonly ICompositeLogSource _compositeLogSource;
     private readonly ISummarizerService _summarizerService;
 
     public HandleAppMentionCommandHandler(
         ISlackChatService slackChatService,
         IMentionParserService mentionParserService,
-        ILogSourceService logSourceService,
+         ICompositeLogSource compositeLogSource,
         ISummarizerService summarizerService)
     {
         _slackChatService = slackChatService;
         _mentionParserService = mentionParserService;
-        _logSourceService = logSourceService;
+        _compositeLogSource = compositeLogSource;
         _summarizerService = summarizerService;
     }
 
@@ -92,9 +92,14 @@ public class HandleAppMentionCommandHandler : IRequestHandler<HandleAppMentionCo
                 source = SourceType.Datadog;
             }
 
-            var timeRange = new TimeRange(start, end);
+            // var timeRange = new TimeRange(start, end);
 
-            var logs = await _logSourceService.GetLogsAsync(timeRange, source);
+            var logs = await _compositeLogSource.GetLogsAsync(new Domain.Models.GetLogModel
+            {
+                StartTime = start,
+                EndTime = end,
+                Source = source,
+            });
 
             var summary = await _summarizerService.SummarizeAsync(logs, DesiredOutputType.Text);
 
