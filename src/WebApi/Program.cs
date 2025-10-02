@@ -4,7 +4,9 @@ using Microsoft.Extensions.Options;
 using SlackNet.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
-
+builder.Configuration
+    .AddUserSecrets(typeof(Program).Assembly)
+    .AddEnvironmentVariables();
 // Add services to the container.
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
