@@ -4,18 +4,17 @@ public enum IntentType
 {
     Summarize,
     Analyze,
-    // TODO: Add more as needed
+    Report
 }
 
 public enum SourceType
 {
     Datadog,
-    // TODO: Add more as needed
+    Folder
 }
 
 public enum DesiredOutputType
 {
     Text,
-    Json,
-    // TODO: Add more as needed
+    Json
 }

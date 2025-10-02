@@ -1,9 +1,10 @@
+using System.Threading;
+using System.Threading.Tasks;
 using Domain.Shared;
 
 namespace Application.Interfaces;
 
 public interface IMentionParserService
 {
-    Task<ParsedMentionResult> ParseMentionAsync(string text);
+    Task<MentionParseResult> ParseMentionAsync(string text, CancellationToken cancellationToken = default);
 }
-

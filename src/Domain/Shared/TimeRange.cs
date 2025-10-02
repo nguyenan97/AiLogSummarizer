@@ -1,3 +1,3 @@
 namespace Domain.Shared;
 
-public record TimeRange(DateTime Start, DateTime End);
+public record TimeRange(DateTimeOffset Start, DateTimeOffset End);
