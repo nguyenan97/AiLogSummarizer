@@ -1,12 +1,10 @@
-using System;
 using Application.Common.Interfaces;
 using Application.Interfaces;
-using Azure;
-using Azure.AI.OpenAI;
 using Domain.Interfaces;
+using Domain.MentionParsing.Models;
 using Domain.Models;
 using Domain.Shared;
-using Infrastructure.Options;
+using Infrastructure.AI.MentionParser;
 using Infrastructure.Persistence;
 using Infrastructure.Repositories;
 using Infrastructure.Services;
@@ -16,7 +14,6 @@ using LogReader.Services.Sources;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using SlackNet.AspNetCore;
 using SlackNet.Events;
 using SlackNet.Extensions.DependencyInjection;
@@ -37,21 +34,17 @@ public static class DependencyInjection
 
         services.AddScoped<IDateTimeService, DateTimeService>();
 
-        services.AddOptions<AzureOpenAIOptions>()
-            .Bind(configuration.GetSection("OpenAI"))
-            .ValidateDataAnnotations()
+        services.AddOptions<MentionParserOptions>()
+            .Bind(configuration.GetSection("MentionParser"))
+            .Validate(options =>
+                !string.IsNullOrWhiteSpace(options.Endpoint) &&
+                !string.IsNullOrWhiteSpace(options.DeploymentName),
+                "MentionParser configuration requires both Endpoint and DeploymentName.")
             .ValidateOnStart();
+
         services.AddOptions<DatadogSettings>().Bind(configuration.GetSection("Datadog"));
         services.AddOptions<LogFolderSettings>().Bind(configuration.GetSection("LogFolder"));
 
-
-        services.AddSingleton(sp =>
-        {
-            var options = sp.GetRequiredService<IOptions<AzureOpenAIOptions>>().Value;
-            return new AzureOpenAIClient(new Uri(options.Endpoint), new AzureKeyCredential(options.ApiKey));
-        });
-
-        // SlackNet: tokens + signing secret + event handlers
         services.AddSlackNet(c =>
         {
             c.UseApiToken(configuration["Slack:BotToken"]!);
@@ -75,4 +68,3 @@ public static class DependencyInjection
         return services;
     }
 }
-
