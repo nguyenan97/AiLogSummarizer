@@ -1,9 +1,12 @@
 using Application;
 using Infrastructure;
-using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Hosting;
 using SlackNet.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.AddServiceDefaults();
+
 builder.Configuration
     .AddUserSecrets(typeof(Program).Assembly)
     .AddEnvironmentVariables();
@@ -22,7 +25,6 @@ builder.Services.AddSwaggerGen(c =>
         Description = "API Documentation"
     });
 });
-
 
 builder.Services.AddHealthChecks()
     .AddSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")!);
@@ -49,6 +51,11 @@ app.MapControllers();
 // Slack events endpoint (default route prefix: /slack)
 app.UseSlackNet();
 
-app.MapHealthChecks("/health");
+if (!app.Environment.IsDevelopment())
+{
+    app.MapHealthChecks("/health");
+}
+
+app.MapDefaultEndpoints();
 
 await app.RunAsync();

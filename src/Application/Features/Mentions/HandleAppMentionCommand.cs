@@ -40,65 +40,13 @@ public class HandleAppMentionCommandHandler : IRequestHandler<HandleAppMentionCo
 
         try
         {
-            var parseResult = await _mentionParserService.ParseMentionAsync(request.Text, cancellationToken);
-
-            if (!parseResult.Success)
-            {
-                var suggestion = !string.IsNullOrWhiteSpace(parseResult.Suggestion)
-                    ? parseResult.Suggestion
-                    : "Invalid syntax. Example: @OopsAI Summarize last 2 hours";
-
-                await _slackChatService.SendMessageAsync(request.Channel, suggestion, request.ThreadTs);
-                return;
-            }
-
-            if (!Enum.TryParse(parseResult.Intent, true, out IntentType intent))
-            {
-                await _slackChatService.SendMessageAsync(
-                    request.Channel,
-                    $"Intent '{parseResult.Intent}' is not supported.",
-                    request.ThreadTs);
-                return;
-            }
-
-            if (parseResult.Range is null ||
-                string.IsNullOrWhiteSpace(parseResult.Range.Start) ||
-                string.IsNullOrWhiteSpace(parseResult.Range.End))
-            {
-                var message = parseResult.Suggestion ?? "No valid time range found. Try again with a specific time.";
-                await _slackChatService.SendMessageAsync(request.Channel, message, request.ThreadTs);
-                return;
-            }
-
-            if (!DateTimeOffset.TryParse(parseResult.Range.Start, ParserCulture, DateTimeStyles.RoundtripKind, out var start) ||
-                !DateTimeOffset.TryParse(parseResult.Range.End, ParserCulture, DateTimeStyles.RoundtripKind, out var end))
-            {
-                await _slackChatService.SendMessageAsync(
-                    request.Channel,
-                    "Unable to parse time data. Please try again later.",
-                    request.ThreadTs);
-                return;
-            }
-
-            if (end <= start)
-            {
-                var message = parseResult.Suggestion ?? "Invalid time range. Example: @OopsAI Analyze from 8 AM to 10 AM";
-                await _slackChatService.SendMessageAsync(request.Channel, message, request.ThreadTs);
-                return;
-            }
-
-            if (!Enum.TryParse(parseResult.Source, true, out SourceType source))
-            {
-                source = SourceType.Datadog;
-            }
-
-            // var timeRange = new TimeRange(start, end);
+            var parseResult = await _mentionParserService.ParseAsync(request.Text, cancellationToken);
 
             var logs = await _compositeLogSource.GetLogsAsync(new Domain.Models.GetLogModel
             {
-                StartTime = start,
-                EndTime = end,
-                Source = source,
+                StartTime = DateTimeOffset.UtcNow,
+                EndTime = DateTimeOffset.UtcNow,
+                Source = SourceType.Datadog,
             });
 
             var summary = await _summarizerService.SummarizeAsync(logs, DesiredOutputType.Text);

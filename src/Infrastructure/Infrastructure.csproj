@@ -18,8 +18,6 @@
     <PackageReference Include="Microsoft.Extensions.AI" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
     <PackageReference Include="Azure.Identity" />
-    <PackageReference Include="Microsoft.SemanticKernel.Agents.Core" />
-    <PackageReference Include="Microsoft.SemanticKernel.Agents.Abstractions" />
   </ItemGroup>
 
   <PropertyGroup>
