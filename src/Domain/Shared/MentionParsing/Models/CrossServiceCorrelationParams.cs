@@ -1,11 +1,39 @@
-using System;
+using System.Collections.Generic;
+using Domain.MentionParsing.Models.Contracts;
 
 namespace Domain.MentionParsing.Models;
 
-public sealed record CrossServiceCorrelationParams : ICaseParameters
+/// <summary>
+/// Parameters to correlate events across services using shared attributes (e.g., orderId).
+/// </summary>
+public sealed record CrossServiceCorrelationParams : ICaseParameters, IHasTimeBounds
 {
-    public string[] CorrelationKeys { get; init; } = Array.Empty<string>();
+    /// <summary>
+    /// Key/value attributes to join across services, e.g., {"orderId":"9981"}.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> CorrelationAttributes { get; init; } = new Dictionary<string, string>();
+
+    /// <summary>
+    /// Relative lookback window for correlation (default 24h).
+    /// </summary>
     public string Lookback { get; init; } = "PT24H";
+
+    /// <summary>
+    /// Optional environment constraint (e.g., prod).
+    /// </summary>
     public string? Environment { get; init; }
+
+    /// <summary>
+    /// Timezone for resolving time expressions.
+    /// </summary>
     public string TimeZone { get; init; } = "Asia/Ho_Chi_Minh";
+
+    /// <summary>
+    /// Common Datadog-friendly context (service/env/time/tags/trace).
+    /// </summary>
+    public CaseContext Context { get; init; } = new();
+
+    // IHasTimeBounds delegation
+    public string? FromIso => Context.FromIso;
+    public string? ToIso => Context.ToIso;
 }

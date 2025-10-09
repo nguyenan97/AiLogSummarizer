@@ -5,5 +5,5 @@ namespace Application.Interfaces;
 
 public interface ILogSourceService
 {
-    Task<IEnumerable<TraceLog>> GetLogsAsync(GetLogModel model);
+    Task<IEnumerable<TraceLog>> GetLogsAsync(LogQueryContext model);
 }

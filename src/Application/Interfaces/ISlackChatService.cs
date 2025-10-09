@@ -1,6 +1,6 @@
 namespace Application.Interfaces;
 
-public interface ISlackChatService
+public interface IMessageSenderService
 {
     Task SendMessageAsync(string channel, string message, string? threadTs = null);
 }

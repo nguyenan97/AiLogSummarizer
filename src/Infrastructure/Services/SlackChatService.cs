@@ -4,7 +4,7 @@ using SlackNet.WebApi;
 
 namespace Infrastructure.Services;
 
-public class SlackChatService : ISlackChatService
+public class SlackChatService : IMessageSenderService
 {
     private readonly ISlackApiClient _slackApiClient;
 

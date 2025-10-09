@@ -1,0 +1,326 @@
+﻿name: ci
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+env:
+  DOTNET_VERSION: '9.0.x'
+  IMAGE_NAME: oopsai-api
+  REGISTRY: ghcr.io
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Create logs directory
+        run: mkdir -p logs
+
+      - name: Restore solution
+        run: dotnet restore OopsAI.sln
+
+      - name: Build solution
+        run: dotnet build OopsAI.sln -c Release --no-restore /p:TreatWarningsAsErrors=false
+        env:
+          ASPNETCORE_ENVIRONMENT: CI
+          
+      - name: Publish WebApi
+        run: dotnet publish src/WebApi/WebApi.csproj -c Release -o publish --no-build
+
+      - name: Upload build logs artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: logs/
+          retention-days: 7
+
+      - name: Upload publish artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: publish
+          path: publish
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: build-test
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+      image-url: ${{ steps.meta.outputs.tags }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=main,enable={{is_default_branch}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            ASPNETCORE_ENVIRONMENT=Production
+          platforms: linux/amd64
+
+      - name: Verify image push and make public
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "Verifying pushed images:"
+          echo "Registry: ${{ env.REGISTRY }}"
+          echo "Login User: ${{ github.actor }}"
+          echo "Tags: ${{ steps.meta.outputs.tags }}"
+          echo "Digest: ${{ steps.build.outputs.digest }}"
+          
+          # Test pulling the image to verify it's accessible
+          if docker pull ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:main; then
+            echo "✅ Image successfully pulled"
+            docker images | grep ${{ env.IMAGE_NAME }}
+          else
+            echo "❌ Failed to pull image - may be private or have access issues"
+            echo "Repository owner: ${{ github.repository_owner }}"
+            echo "Login User: ${{ github.actor }}"
+            echo "Event: ${{ github.event_name }}"
+            exit 1
+          fi
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: docker
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      - name: Deploy to Ubuntu Server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USERNAME }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          port: ${{ secrets.VM_PORT || 22 }}
+          envs: GITHUB_TOKEN
+          script: |
+            # Update system packages
+            sudo apt-get update
+            
+            # Install Docker if not present
+            if ! command -v docker &> /dev/null; then
+              echo "Installing Docker..."
+              sudo apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release
+              curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+              echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+              sudo apt-get update
+              sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+              sudo usermod -aG docker $USER
+              # Reload shell to apply group changes
+              newgrp docker
+            fi
+            
+            # Ensure Docker service is running
+            sudo systemctl start docker
+            sudo systemctl enable docker
+            
+            # Create application directory and logs directory with proper permissions
+            sudo mkdir -p /opt/OopsAI/logs
+            sudo chmod 755 /opt/OopsAI
+            sudo chmod 755 /opt/OopsAI/logs
+            
+            # Ensure .env file exists
+            if [ ! -f "/opt/OopsAI/.env" ]; then
+              echo "Error: /opt/OopsAI/.env file not found. Please create it with required environment variables."
+              exit 1
+            fi
+            
+            # Login to GitHub Container Registry
+            echo "Logging in to GitHub Container Registry..."
+            
+            for i in {1..3}; do
+              if echo "${{ secrets.GITHUB_TOKEN }}" | docker login ${{ env.REGISTRY }} -u "${{ github.actor }}" --password-stdin; then
+                echo "Successfully logged in to GHCR as user: ${{ github.actor }}"
+                break
+              else
+                echo "Login attempt $i failed, retrying..."
+                sleep 5
+              fi
+              if [ $i -eq 3 ]; then
+                echo "Failed to login to GHCR after 3 attempts"
+                exit 1
+              fi
+            done
+            
+            # Stop and remove existing container if it exists
+            echo "Stopping existing container..."
+            docker stop ${{ env.IMAGE_NAME }} 2>/dev/null || echo "No existing container to stop"
+            docker rm ${{ env.IMAGE_NAME }} 2>/dev/null || echo "No existing container to remove"
+            
+            # Pull the latest image with retry logic
+            IMAGE_URL="${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:main"
+            echo "Pulling image: $IMAGE_URL"
+            
+            for i in {1..3}; do
+              if docker pull "$IMAGE_URL"; then
+                echo "Successfully pulled image"
+                break
+              else
+                echo "Pull attempt $i failed, retrying..."
+                sleep 10
+              fi
+              if [ $i -eq 3 ]; then
+                echo "Failed to pull image after 3 attempts"
+                echo "Available images in registry:"
+                docker search ${{ env.REGISTRY }}/${{ github.repository_owner }} || echo "Cannot search registry"
+                exit 1
+              fi
+            done
+            
+            # Verify image was pulled successfully
+            if ! docker images | grep -q "${{ env.IMAGE_NAME }}"; then
+              echo "Image not found locally after pull"
+              docker images
+              exit 1
+            fi
+            
+            # Run the new container with comprehensive Serilog configuration
+            echo "Starting new container with Serilog configuration..."
+            docker run -d \
+              --name ${{ env.IMAGE_NAME }} \
+              --restart unless-stopped \
+              -p 8080:8080 \
+              --env-file /opt/OopsAI/.env \
+              -e ASPNETCORE_ENVIRONMENT=Production \
+              -e TZ=UTC \
+              -e Serilog__MinimumLevel__Default=Information \
+              -e Serilog__MinimumLevel__Override__Microsoft=Warning \
+              -e Serilog__MinimumLevel__Override__System=Warning \
+              -e Serilog__WriteTo__1__Args__path=/app/logs/OopsAI-.txt \
+              -e Serilog__WriteTo__1__Args__rollingInterval=Day \
+              -e Serilog__WriteTo__1__Args__rollOnFileSizeLimit=true \
+              -e Serilog__WriteTo__1__Args__fileSizeLimitBytes=10485760 \
+              -e Serilog__WriteTo__1__Args__retainedFileCountLimit=10 \
+              -v /opt/OopsAI/logs:/app/logs \
+              -v /etc/localtime:/etc/localtime:ro \
+              --log-driver json-file \
+              --log-opt max-size=10m \
+              --log-opt max-file=5 \
+              --log-opt compress=true \
+              --health-cmd="curl -f http://localhost:8080/health || exit 1" \
+              --health-interval=30s \
+              --health-timeout=10s \
+              --health-retries=3 \
+              --health-start-period=30s \
+              "$IMAGE_URL"
+            
+            # Wait for container to start and become healthy
+            echo "Waiting for container to start..."
+            for i in {1..12}; do  # Wait up to 2 minutes
+              sleep 10
+              if docker ps --filter "name=${{ env.IMAGE_NAME }}" --filter "status=running" | grep -q ${{ env.IMAGE_NAME }}; then
+                echo "Container is running, checking health..."
+                
+                # Wait a bit more for health check to stabilize
+                sleep 20
+                
+                # Check container health status
+                HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' ${{ env.IMAGE_NAME }} 2>/dev/null || echo "unknown")
+                echo "Container health status: $HEALTH_STATUS"
+                
+                if [ "$HEALTH_STATUS" = "healthy" ] || [ "$HEALTH_STATUS" = "unknown" ]; then
+                  echo "Container appears healthy, testing endpoints..."
+                  
+                  # Test health endpoint directly
+                  if curl -f -s --connect-timeout 5 --max-time 10 http://localhost:8080/health > /dev/null; then
+                    echo "✅ Health check passed"
+                    break
+                  else
+                    echo "⚠️ Health endpoint test failed, but container is running"
+                    if [ $i -eq 12 ]; then
+                      echo "Health check failed after maximum retries"
+                      docker logs --tail 50 ${{ env.IMAGE_NAME }}
+                      exit 1
+                    fi
+                  fi
+                elif [ "$HEALTH_STATUS" = "unhealthy" ]; then
+                  echo "Container is unhealthy"
+                  docker logs --tail 50 ${{ env.IMAGE_NAME }}
+                  exit 1
+                fi
+              else
+                echo "Waiting for container to start... (attempt $i/12)"
+                if [ $i -eq 12 ]; then
+                  echo "Container failed to start after maximum wait time"
+                  echo "=== Container logs ==="
+                  docker logs ${{ env.IMAGE_NAME }}
+                  echo "=== Container status ==="
+                  docker ps -a | grep ${{ env.IMAGE_NAME }}
+                  exit 1
+                fi
+              fi
+            done
+            
+            # Show startup logs for verification
+            echo "=== Container startup logs ==="
+            docker logs --tail 30 ${{ env.IMAGE_NAME }}
+            
+            # Show Serilog configuration verification
+            echo "=== Verifying Serilog configuration ==="
+            docker exec ${{ env.IMAGE_NAME }} ls -la /app/logs/ 2>/dev/null || echo "Could not access container logs directory"
+            
+            # Show host log directory contents
+            echo "=== Host log directory contents ==="
+            ls -la /opt/OopsAI/logs/ || echo "Host logs directory is empty or inaccessible"
+            
+            # Clean up old images (keep last 2 versions)
+            docker image prune -af --filter "until=24h"
+            
+            # Show final container status
+            echo "=== Final container status ==="
+            docker ps | grep ${{ env.IMAGE_NAME }}
+            docker stats --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}" | grep ${{ env.IMAGE_NAME }}
+            
+            echo "✅ Deployment completed successfully!"
+            echo "🌐 Application is running at: http://localhost:8080"
+            echo "📁 Logs are available in: /opt/OopsAI/logs/"
+            echo "📋 View logs with: docker logs -f ${{ env.IMAGE_NAME }}"

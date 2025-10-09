@@ -1,5 +1,7 @@
 using Application.Common.Queries;
+using Application.Features.Mentions;
 using Application.Interfaces;
+using Domain.Models;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -24,15 +26,18 @@ public class SystemController : ControllerBase
         var result = await _mediator.Send(new GetDateNowQuery());
         return Ok(result);
     }
-    [HttpGet("test-logs")]
-    public async Task<IActionResult> GetLogs()
+
+    [HttpPost("search-logs")]
+    public async Task<IActionResult> SearchLog([FromBody]LogQueryContext model)
     {
-        var result = await _compositeLogSource.GetLogsAsync(new Domain.Models.GetLogModel
-        {
-            StartTime = DateTime.UtcNow.AddHours(-1),
-            EndTime = DateTime.UtcNow,
-            Source = Domain.Shared.SourceType.Datadog
-        });
+        model.Source = Domain.Shared.SourceType.Datadog;
+        var result = await _compositeLogSource.GetLogsAsync(model);
         return Ok(result);
+    }
+    [HttpPost("test-chat")]
+    public async Task<IActionResult> TestChat([FromBody] HandleAppMentionCommand model)
+    {
+        await _mediator.Send(model);
+        return Ok();
     }
 }

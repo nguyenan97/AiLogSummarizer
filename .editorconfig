@@ -325,9 +325,6 @@ dotnet_diagnostic.CA1846.severity = suggestion
 # CA1847: Use string.Contains(char) instead of string.Contains(string) with single characters
 dotnet_diagnostic.CA1847.severity = suggestion
 
-# IDE0055: Fix formatting
-dotnet_diagnostic.IDE0055.severity = warning
-
 # IDE0073: File header
 dotnet_diagnostic.IDE0073.severity = silent
 

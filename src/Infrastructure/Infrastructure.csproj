@@ -9,6 +9,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="SharpToken" />
     <PackageReference Include="SlackNet" />
     <PackageReference Include="SlackNet.AspNetCore" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
