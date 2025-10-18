@@ -140,18 +140,26 @@ public sealed class MentionParserService : IMentionParserService
         {
             return cached;
         }
-
-        var memories = await _historyLayerService.GetUserMemoriesAsync(conversationKey);
-        var top = memories?
-            .Where(m => !string.IsNullOrWhiteSpace(m.Memory) || !string.IsNullOrWhiteSpace(m.Text))
-            .Take(20)
-            .ToList();
-
         var result = new List<Microsoft.Extensions.AI.ChatMessage>();
-        if (top is { Count: > 0 })
+
+        try
         {
-            var memoryBlock = string.Join("\n", top.Select(m => $"- {(m.Memory ?? m.Text)!.Trim()}"));
-            result.Add(new(ChatRole.System, "[Keywords: ]\n" + memoryBlock));
+            var memories = await _historyLayerService.GetUserMemoriesAsync(conversationKey);
+            var top = memories?
+                .Where(m => !string.IsNullOrWhiteSpace(m.Memory) || !string.IsNullOrWhiteSpace(m.Text))
+                .Take(20)
+                .ToList();
+
+
+            if (top is { Count: > 0 })
+            {
+                var memoryBlock = string.Join("\n", top.Select(m => $"- {(m.Memory ?? m.Text)!.Trim()}"));
+                result.Add(new(ChatRole.Assistant, "[Keywords: ]\n" + memoryBlock));
+            }
+        }
+        catch(Exception ex)
+        {
+            _logger.LogError(ex, "Error getting user memories");
         }
 
         _memoryMessagesCache[conversationKey] = result;

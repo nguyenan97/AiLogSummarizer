@@ -43,6 +43,9 @@ namespace Infrastructure.Services.Summarizer
         /// <summary>
         /// (Từ IChunkProcessorService) Điều phối việc xử lý các chunk log theo chiến lược đã chọn.
         /// </summary>
+        // TODO: Add QC-specific processing strategies (e.g., anomaly detection, SLA monitoring)
+        // Next step: Implement ML-based error prediction and proactive alerting
+        // Improvement: Add unit tests for all processing strategies
         public async Task<List<SummarizerResponse>> ProcessChunksAsync(List<LogChunk> chunks, ProcessingStrategy strategy, CancellationToken cancellationToken = default)
         {
             var chatClient = _clientFactory.CreateChatClient();

@@ -1,0 +1,20 @@
+# Example Terraform variables file
+# Copy this file to terraform.tfvars and customize the values as needed
+
+# Resource group name
+resource_group_name = "oopsai-resource-group"
+
+# Azure region (Southeast Asia for OopsAI project)
+location = "Southeast Asia"
+
+# App Service Plan name
+app_service_plan_name = "oopsai-app-service-plan"
+
+# Application Insights name
+app_insights_name = "oopsai-app-insights"
+
+# Web App name (base name, suffix will be appended for uniqueness)
+web_app_name = "oopsai-web-app"
+
+# Suffix to append to web app name for global uniqueness (e.g., random string or environment identifier)
+web_app_name_suffix = "-prod"

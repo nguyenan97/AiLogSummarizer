@@ -16,6 +16,13 @@ namespace WebApi.Controllers;
 [Route("api/[controller]")]
 public class SystemController : ControllerBase
 {
+    // This controller is now deprecated. All endpoints have been moved to specialized controllers:
+    // - DateTimeController: for datetime operations
+    // - LogController: for log search and fake log generation
+    // - MentionController: for mention/chat testing
+    // - SummarizerController: for summarization testing
+    // TODO: Remove this controller after verifying all endpoints work in new controllers.
+
     private readonly IMediator _mediator;
     private readonly ICompositeLogSource _compositeLogSource;
     private readonly ISummarizerService _summarizerService;
@@ -34,6 +41,7 @@ public class SystemController : ControllerBase
         _fakeLogGenerateService = fakeLogGenerateService;
     }
 
+    [Obsolete("Use DateTimeController.GetDateTime instead")]
     [HttpGet("datetime")]
     public async Task<IActionResult> GetDateTime()
     {
@@ -41,6 +49,7 @@ public class SystemController : ControllerBase
         return Ok(result);
     }
 
+    [Obsolete("Use LogController.SearchLog instead")]
     [HttpPost("search-logs")]
     public async Task<IActionResult> SearchLog([FromBody]LogQueryContext model)
     {
@@ -48,12 +57,16 @@ public class SystemController : ControllerBase
         var result = await _compositeLogSource.GetLogsAsync(model);
         return Ok(result);
     }
+
+    [Obsolete("Use MentionController.TestChat instead")]
     [HttpPost("test-chat")]
     public async Task<IActionResult> TestChat([FromBody] HandleAppMentionCommand model)
     {
         await _mediator.Send(model);
         return Ok();
     }
+
+    [Obsolete("Use LogController.GenerateFakeLog instead")]
     [HttpPost("generate-fake-log")]
     public async Task<IActionResult> GenerateFakeLog(string language,string severity)
     {
@@ -61,6 +74,8 @@ public class SystemController : ControllerBase
         Log.Error(log.Message, log);
         return Ok(log);
     }
+
+    [Obsolete("Use SummarizerController.TestSummarize instead")]
     [HttpPost("test-summarize")]
     public async Task<ActionResult<SummarizerResponse>> Summarize()
     {

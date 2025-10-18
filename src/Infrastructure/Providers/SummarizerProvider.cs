@@ -56,7 +56,18 @@ namespace Infrastructure.Providers
                         providerConfig.Settings.SafeMargin
                     );
 
-                // Thêm các case cho "Gemini", "ChatGPT"
+                case "ChatGPT":
+                    // TODO: Implement ChatGPT factory and service
+                    // Next step: Create ChatGPTFactory similar to AzureOpenAIFactory
+                    // Improvement: Add support for OpenAI API with proper error handling
+                    throw new NotImplementedException("ChatGPT provider not yet implemented");
+
+                case "Gemini":
+                    // TODO: Implement Gemini factory and service
+                    // Next step: Create GeminiFactory using Google AI SDK
+                    // Improvement: Add Google Gemini integration for cost-effective AI processing
+                    throw new NotImplementedException("Gemini provider not yet implemented");
+
                 default:
                     throw new InvalidOperationException($"Unsupported AI provider type: '{providerConfig.Type}'");
             }
