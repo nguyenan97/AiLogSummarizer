@@ -1,7 +1,14 @@
+using System.Text.Json;
 using Application.Common.Queries;
+using Application.Features.Mentions;
 using Application.Interfaces;
+using Application.Models;
+using Domain.MentionParsing.Models;
+using Domain.Models;
+using Domain.Shared;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Serilog;
 
 namespace WebApi.Controllers;
 
@@ -11,11 +18,20 @@ public class SystemController : ControllerBase
 {
     private readonly IMediator _mediator;
     private readonly ICompositeLogSource _compositeLogSource;
+    private readonly ISummarizerService _summarizerService;
+    private readonly IWebHostEnvironment _webHostEnvironment;
+    private readonly IFakeLogGenerateService _fakeLogGenerateService;
 
-    public SystemController(IMediator mediator, ICompositeLogSource compositeLogSource)
+    public SystemController(IMediator mediator, ICompositeLogSource compositeLogSource,
+        IWebHostEnvironment webHostEnvironment,
+        ISummarizerService summarizerService,
+        IFakeLogGenerateService fakeLogGenerateService)
     {
         _mediator = mediator;
         _compositeLogSource = compositeLogSource;
+        _webHostEnvironment = webHostEnvironment;
+        _summarizerService = summarizerService;
+        _fakeLogGenerateService = fakeLogGenerateService;
     }
 
     [HttpGet("datetime")]
@@ -24,15 +40,39 @@ public class SystemController : ControllerBase
         var result = await _mediator.Send(new GetDateNowQuery());
         return Ok(result);
     }
-    [HttpGet("test-logs")]
-    public async Task<IActionResult> GetLogs()
+
+    [HttpPost("search-logs")]
+    public async Task<IActionResult> SearchLog([FromBody]LogQueryContext model)
     {
-        var result = await _compositeLogSource.GetLogsAsync(new Domain.Models.GetLogModel
-        {
-            StartTime = DateTime.UtcNow.AddHours(-1),
-            EndTime = DateTime.UtcNow,
-            Source = Domain.Shared.SourceType.Datadog
-        });
+        model.Source = Domain.Shared.SourceType.Datadog;
+        var result = await _compositeLogSource.GetLogsAsync(model);
+        return Ok(result);
+    }
+    [HttpPost("test-chat")]
+    public async Task<IActionResult> TestChat([FromBody] HandleAppMentionCommand model)
+    {
+        await _mediator.Send(model);
+        return Ok();
+    }
+    [HttpPost("generate-fake-log")]
+    public async Task<IActionResult> GenerateFakeLog(string language,string severity)
+    {
+        var log= await _fakeLogGenerateService.GenerateFakeLog(language, severity);
+        Log.Error(log.Message, log);
+        return Ok(log);
+    }
+    [HttpPost("test-summarize")]
+    public async Task<ActionResult<SummarizerResponse>> Summarize()
+    {
+        // pick one mock log file from Tests/MockData
+        string fileName = "mockData/logfile.txt";
+        string filePath = Path.Combine(_webHostEnvironment.ContentRootPath, fileName);
+
+        string rawLogs = System.IO.File.ReadAllText(filePath);
+
+        var traceLogs = JsonSerializer.Deserialize<List<TraceLog>>(rawLogs)?? new List<TraceLog>();
+
+        var result = await _summarizerService.ProcessLogsAsync(traceLogs, IntentType.Summarize);
         return Ok(result);
     }
 }

@@ -13,6 +13,7 @@ namespace Domain.Models
         public string ApiKey { get; set; } = string.Empty;
         public string AppKey { get; set; } = string.Empty;
         public string DefaultQuery { get; set; } = "status:error";
+        public bool BuildQueryWithAI { get; set; }
     }
 
     public class LogFolderSettings
