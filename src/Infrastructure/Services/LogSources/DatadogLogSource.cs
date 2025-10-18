@@ -30,10 +30,13 @@ namespace LogReader.Services.Sources
             _mentionParserOptions= _MentionParserOptionsOptionValue.Value;
             _mentionParserService = mentionParserService;
         }
+        // TODO: Add support for SQL-like trace queries (e.g., SELECT * FROM logs WHERE error_code = '500')
+        // Next step: Implement query builder for complex trace correlations
+        // Improvement: Add caching layer for frequently accessed logs
         public async Task<IEnumerable<TraceLog>> GetLogsAsync(LogQueryContext model)
         {
             var url = $"/api/v2/logs/events/search";
-           
+
             object? request;
             if (_datadogSettings.BuildQueryWithAI)
             {

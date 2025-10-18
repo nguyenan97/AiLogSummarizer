@@ -38,6 +38,9 @@ public class HandleAppMentionCommandHandler : IRequestHandler<HandleAppMentionCo
         var conversationKey = request.UseHistory ? $"{request.Channel}:{request.ThreadTs}" : null;
         var parseResult = await _mentionParserService.ParseAsync(request.Text, conversationKey, cancellationToken);
 
+        // TODO: Add email notification support for critical errors
+        // Next step: Integrate SMTP service for automated error reports
+        // Improvement: Implement MCP for dynamic AI model switching based on error severity
         // Send localized processing message with loading icon based on detected language
         var processingMessage = BuildProcessingMessage(parseResult!.Language);
         await _messageSenderService.SendMessageAsync(request.Channel, processingMessage, request.ThreadTs);
@@ -71,10 +74,18 @@ public class HandleAppMentionCommandHandler : IRequestHandler<HandleAppMentionCo
         await _messageSenderService.SendMessageAsync(request.Channel, summary.RawMarkdown, request.ThreadTs);
         if (logs.Any() && !request.UseHistory)
         {
-            await _historyLayerService.AddMemoryAsync(
-                    userMessage: summary.RawMarkdown,
-                    userId: $"{request.Channel}:{request.ThreadTs}"
-                );
+            try
+            {
+                await _historyLayerService.AddMemoryAsync(
+                        userMessage: request.Text,
+                        userId: $"{request.Channel}:{request.ThreadTs}",
+                        assistantResponse: summary.RawMarkdown
+                    );
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error adding memory");
+            }
         }
     }
 

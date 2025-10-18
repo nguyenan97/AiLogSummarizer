@@ -13,6 +13,9 @@ namespace Infrastructure.Utils
         /// <param name="sanitizedLogs">Danh sách log ĐÃ ĐƯỢC LÀM SẠCH bởi LogSanitizer.</param>
         /// <param name="contextWindow">Số lượng dòng log (không phải lỗi) trước dòng lỗi để lấy làm ngữ cảnh.</param>
         /// <returns>Một danh sách các LogChunk, mỗi chunk chứa một vấn đề duy nhất.</returns>
+        // TODO: Add AI-powered chunking for better error correlation
+        // Next step: Use ML to identify related errors across services for cross-service correlation
+        // Improvement: Implement dynamic context window based on log complexity
         public static List<LogChunk> ChunkLogs(List<TraceLog> sanitizedLogs, int contextWindow = 7)
         {
             if (sanitizedLogs == null || !sanitizedLogs.Any())

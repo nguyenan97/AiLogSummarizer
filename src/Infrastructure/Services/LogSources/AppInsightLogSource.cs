@@ -19,6 +19,9 @@ public class AppInsightsLogSource : ILogSourceService
         _logsQueryClient = new LogsQueryClient(credential);
     }
 
+    // TODO: Refactor to return IEnumerable<TraceLog> instead of string for consistency with other log sources
+    // Next step: Implement proper TraceLog parsing from AppInsights response
+    // Improvement: Add AI-powered query enhancement for complex log searches
     public async Task<string> GetLogsAsync(DateTimeOffset from, DateTimeOffset to, string query)
     {
         var sb = new StringBuilder();

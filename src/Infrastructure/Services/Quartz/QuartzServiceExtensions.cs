@@ -12,49 +12,46 @@ namespace Infrastructure.Services.Quartz
 
             if (quartzConfiguration.Enabled)
             {
+                services.AddSingleton<QuartzJobRegistry>();
+                services.AddSingleton<IJobListener, QuartzJobListener>();
+
                 services.AddQuartz(q =>
                 {
                     q.UseInMemoryStore();
-
-                    foreach (var quartzJob in quartzConfiguration.Jobs)
-                    {
-                        if (string.IsNullOrEmpty(quartzJob.Name)
-                            || string.IsNullOrEmpty(quartzJob.TypeName)
-                            || !quartzJob.Enabled)
-                        {
-                            continue;
-                        }
-
-                        var jobType = Type.GetType(quartzJob.TypeName, throwOnError: false);
-                        if (jobType is null || !typeof(IJob).IsAssignableFrom(jobType))
-                        {
-                            continue;
-                        }
-
-                        var jobKey = new JobKey(quartzJob.Name);
-
-                        q.AddJob(jobType, jobKey, (opts) =>
-                        {
-                            if (quartzJob.Data.Count > 0)
-                            {
-                                foreach (var item in quartzJob.Data)
-                                {
-                                    opts.UsingJobData(item.Key, item.Value);
-                                }
-                            }
-                        });
-                        q.AddTrigger(opts => opts
-                            .ForJob(jobKey)
-                            .WithIdentity($"{quartzJob.Name}.trigger")
-                            .WithCronSchedule(quartzJob.Cron, x => x.WithMisfireHandlingInstructionDoNothing())
-                        );
-                    }
+                    //q.UseDefaultThreadPool(tp => tp.MaxConcurrency = 5);
                 });
 
-                services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
+                services.AddQuartzHostedService(opt => opt.WaitForJobsToComplete = true);
+
+                if (quartzConfiguration.Jobs.Count > 0)
+                {
+                    services.AddSingleton(quartzConfiguration.Jobs);
+                }
             }
 
             return services;
+        }
+
+        public static async Task InitializeConfiguredJobsAsync(this IServiceProvider provider)
+        {
+            var schedulerFactory = provider.GetRequiredService<ISchedulerFactory>();
+            var registry = provider.GetRequiredService<QuartzJobRegistry>();
+            var jobConfigs = provider.GetService<List<QuartzJobConfiguration>>();
+
+            var scheduler = await schedulerFactory.GetScheduler();
+            scheduler.ListenerManager.AddJobListener(provider.GetRequiredService<IJobListener>());
+
+            if (jobConfigs == null) return;
+
+            foreach (var cfg in jobConfigs)
+            {
+                var jobType = Type.GetType(cfg.TypeName, throwOnError: false);
+                if (jobType == null) continue;
+                if (cfg.Enabled)
+                {
+                    await registry.AddOrUpdateJobAsync(scheduler, cfg.Name, jobType, cfg.Cron, cfg.Data).ConfigureAwait(false);
+                }
+            }
         }
     }
 }
