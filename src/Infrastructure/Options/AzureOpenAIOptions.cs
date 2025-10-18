@@ -1,15 +1,9 @@
-using System.ComponentModel.DataAnnotations;
-
-namespace Infrastructure.Options;
-
-public sealed class AzureOpenAIOptions
+﻿namespace Infrastructure.Options
 {
-    [Required]
-    public string Endpoint { get; set; } = string.Empty;
-
-    [Required]
-    public string ApiKey { get; set; } = string.Empty;
-
-    [Required]
-    public string DeploymentName { get; set; } = string.Empty;
+    public class AzureOpenAIOptions
+    {
+        public string Endpoint { get; set; } = string.Empty;
+        public string ApiKey { get; set; } = string.Empty;
+        public string DeploymentName { get; set; } = string.Empty;
+    }
 }

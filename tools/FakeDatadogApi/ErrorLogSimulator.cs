@@ -8,6 +8,20 @@ namespace FakeDatadogApi
     {
 
         private static readonly Random Random = new Random();
+        public static string SimulateRandomService()
+        {
+            var services = new string[] { "product-api", "order-api", "user-api", "inventory-api", "payment-api", "shipping-api" };
+            // Randomly select 1-3 errors to simulate
+            int errorCount = Random.Next(1, services.Length);
+            return services[errorCount-1];    
+        }
+        public static string SimulateRandomEnv()
+        {
+            var envs = new string[] { "qc", "uat", "staging", "production" };
+            // Randomly select 1-3 errors to simulate
+            int errorCount = Random.Next(1, envs.Length);
+            return envs[errorCount - 1];
+        }
         public static async Task SimulateRandomErrors(IConfiguration configuration)
         {
             var errorActions = new List<(string, Action)>
@@ -54,19 +68,23 @@ namespace FakeDatadogApi
         }
         private static void SimulateConfigurationError(IConfiguration configuration)
         {
+            var env = SimulateRandomEnv();
+            var service=SimulateRandomService();
             try
             {
                 string configValue = configuration["MissingConfigKey"] ?? throw new InvalidOperationException("Configuration key 'MissingConfigKey' not found.");
-                Log.Information("Config value: {ConfigValue}", configValue);
+               
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Configuration error occurred.");
+                Log.ForContext("ddtags",$"env:{env},service:{service}").Error(ex, "Configuration error occurred.");
             }
         }
 
         private static void SimulateNullReferenceError()
         {
+            var env = SimulateRandomEnv();
+            var service = SimulateRandomService();
             try
             {
                 string[]? array = null;
@@ -74,12 +92,15 @@ namespace FakeDatadogApi
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Null reference error in processing array.");
+                Log.ForContext("ddtags", $"env:{env},service:{service}").Error(ex, "Null reference error in processing array.");
+
             }
         }
 
         private static void SimulateConnectionStringError(IConfiguration configuration)
         {
+            var env = SimulateRandomEnv();
+            var service = SimulateRandomService();
             try
             {
 #pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
@@ -92,12 +113,14 @@ namespace FakeDatadogApi
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Database connection string error.");
+                Log.ForContext("ddtags", $"env:{env},service:{service}").Error(ex, "Database connection string error.");
             }
         }
 
         private static void SimulateDivideByZeroError()
         {
+            var env = SimulateRandomEnv();
+            var service = SimulateRandomService();
             try
             {
                 int zero = 0;
@@ -105,76 +128,89 @@ namespace FakeDatadogApi
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Arithmetic error in calculation.");
+                Log.ForContext("ddtags", $"env:{env},service:{service}").Error(ex, "Arithmetic error in calculation.");
             }
         }
 
         private static void SimulateFileNotFoundError()
         {
+            var env = SimulateRandomEnv();
+            var service = SimulateRandomService();
             try
             {
                 string content = File.ReadAllText("nonexistent.txt");
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Failed to read file due to FileNotFoundException.");
+                Log.ForContext("ddtags", $"env:{env},service:{service}").Error(ex, "Failed to read file due to FileNotFoundException.");
             }
         }
 
         private static void SimulateUnauthorizedAccessError()
         {
+            var env = SimulateRandomEnv();
+            var service = SimulateRandomService();
             try
             {
                 File.WriteAllText("/root/unauthorized.txt", "Test");
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Unauthorized access to file system.");
+                Log.ForContext("ddtags", $"env:{env},service:{service}").Error(ex, "Failed to read file due to FileNotFoundException.");
             }
         }
 
         private static void SimulateTimeoutError()
         {
+            var env = SimulateRandomEnv();
+            var service = SimulateRandomService();
             try
             {
                 throw new TimeoutException("Operation timed out while waiting for external service.");
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Timeout error during external service call.");
+                Log.ForContext("ddtags", $"env:{env},service:{service}").Error(ex, "Timeout error during external service call.");
             }
         }
 
         private static void SimulateArgumentError()
         {
+            var env = SimulateRandomEnv();
+            var service = SimulateRandomService();
             try
             {
                 string invalidInput = "";
                 if (string.IsNullOrEmpty(invalidInput))
                 {
                     throw new ArgumentException("Input parameter cannot be empty.", nameof(invalidInput));
+                    
                 }
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Invalid argument provided.");
+                Log.ForContext("ddtags", $"env:{env},service:{service}").Error(ex, "Invalid argument provided.");
             }
         }
 
         private static void SimulateFormatError()
         {
+            var env = SimulateRandomEnv();
+            var service = SimulateRandomService();
             try
             {
                 int number = int.Parse("not_a_number");
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Failed to parse input string to number.");
+                Log.ForContext("ddtags", $"env:{env},service:{service}").Error(ex, "Failed to parse input string to number.");
             }
         }
 
         private static void SimulateKeyNotFoundError()
         {
+            var env = SimulateRandomEnv();
+            var service = SimulateRandomService();
             try
             {
                 var dict = new Dictionary<string, string>();
@@ -182,12 +218,14 @@ namespace FakeDatadogApi
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Key not found in dictionary.");
+                Log.ForContext("ddtags", $"env:{env},service:{service}").Error(ex, "Key not found in dictionary.");
             }
         }
 
         private static void SimulateInvalidCastError()
         {
+            var env = SimulateRandomEnv();
+            var service = SimulateRandomService();
             try
             {
                 object obj = "123";
@@ -195,12 +233,14 @@ namespace FakeDatadogApi
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Invalid cast operation.");
+                Log.ForContext("ddtags", $"env:{env},service:{service}").Error(ex, "Invalid cast operation.");
             }
         }
 
         private static void SimulateOverflowError()
         {
+            var env = SimulateRandomEnv();
+            var service = SimulateRandomService();
             try
             {
                 checked
@@ -211,12 +251,14 @@ namespace FakeDatadogApi
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Arithmetic overflow occurred.");
+                Log.ForContext("ddtags", $"env:{env},service:{service}").Error(ex, "Arithmetic overflow occurred.");
             }
         }
 
         private static async Task SimulateHttpRequestError()
         {
+            var env = SimulateRandomEnv();
+            var service = SimulateRandomService();
             try
             {
                 using var client = new HttpClient();
@@ -224,19 +266,21 @@ namespace FakeDatadogApi
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Failed to call external API.");
+                Log.ForContext("ddtags", $"env:{env},service:{service}").Error(ex, "Failed to call external API.");
             }
         }
 
         private static void SimulateCustomAppError()
         {
+            var env = SimulateRandomEnv();
+            var service = SimulateRandomService();
             try
             {
                 throw new ApplicationException("Custom business logic error: User quota exceeded.");
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Custom application error occurred.");
+                Log.ForContext("ddtags", $"env:{env},service:{service}").Error(ex, "Custom application error occurred.");
             }
         }
 

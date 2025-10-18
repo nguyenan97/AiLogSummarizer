@@ -1,16 +1,22 @@
-using System;
+﻿using System.Text;
 using Application.Common.Interfaces;
 using Application.Interfaces;
 using Azure;
 using Azure.AI.OpenAI;
 using Domain.Interfaces;
+using Domain.MentionParsing.Models;
 using Domain.Models;
 using Domain.Shared;
 using Infrastructure.Options;
 using Infrastructure.Persistence;
+using Infrastructure.Providers;
 using Infrastructure.Repositories;
 using Infrastructure.Services;
+using Infrastructure.Services.FakeLogs;
 using Infrastructure.Services.LogSources;
+using Infrastructure.Services.Mem0;
+using Infrastructure.Services.MentionParser;
+using Infrastructure.Services.Summarizer;
 using Infrastructure.Slack;
 using LogReader.Services.Sources;
 using Microsoft.EntityFrameworkCore;
@@ -37,13 +43,30 @@ public static class DependencyInjection
 
         services.AddScoped<IDateTimeService, DateTimeService>();
 
-        services.AddOptions<AzureOpenAIOptions>()
-            .Bind(configuration.GetSection("OpenAI"))
-            .ValidateDataAnnotations()
+        services.AddOptions<MentionParserOptions>()
+            .Bind(configuration.GetSection("MentionParser"))
+            .Validate(options =>
+                !string.IsNullOrWhiteSpace(options.Endpoint) &&
+                !string.IsNullOrWhiteSpace(options.DeploymentName),
+                "MentionParser configuration requires both Endpoint and DeploymentName.")
             .ValidateOnStart();
+
+        services.AddOptions<Mem0Options>()
+            .Bind(configuration.GetSection("Mem0"))
+            //.Validate(options =>
+            //    !string.IsNullOrWhiteSpace(options.ApiKey),
+            //    "Mem0 configuration requires ApiKey.")
+            //.Validate(options =>
+            //    !string.IsNullOrWhiteSpace(options.BaseUrl),
+            //    "Mem0 configuration requires BaseUrl.")
+            .ValidateOnStart();
+
+        services.AddOptions<AiProcessingOptions>().Bind(configuration.GetSection("AiProcessing"));
         services.AddOptions<DatadogSettings>().Bind(configuration.GetSection("Datadog"));
         services.AddOptions<LogFolderSettings>().Bind(configuration.GetSection("LogFolder"));
 
+        //Đăng ký SummarizerProvider
+        services.AddScoped<SummarizerProvider>();
 
         services.AddSingleton(sp =>
         {
@@ -51,28 +74,59 @@ public static class DependencyInjection
             return new AzureOpenAIClient(new Uri(options.Endpoint), new AzureKeyCredential(options.ApiKey));
         });
 
-        // SlackNet: tokens + signing secret + event handlers
-        services.AddSlackNet(c =>
+        // Register Mem0Client
+        services.AddSingleton<IMem0Client>(sp =>
         {
-            c.UseApiToken(configuration["Slack:BotToken"]!);
-            c.UseSigningSecret(configuration["Slack:SigningSecret"]!);
-            c.RegisterEventHandler<AppMention>(ctx => ctx.ServiceProvider().GetRequiredService<AppMentionEventHandler>());
+            var options = sp.GetRequiredService<IOptions<Mem0Options>>().Value;
+            return new Mem0Client(options.ApiKey, options.BaseUrl);
         });
 
-        // AppMention handler DI
-        services.AddScoped<AppMentionEventHandler>();
+        services.AddSingleton<ILocalMem0Client>(sp =>
+        {
+            var options = sp.GetRequiredService<IOptions<Mem0Options>>().Value;
+            return new LocalMem0Client(options.BaseUrl);
+        });
 
-        // Slack chat service (SlackNet added in WebApi)
-        services.AddScoped<ISlackChatService, SlackChatService>();
+        // Register HistoryLayerService
+        services.AddScoped<IHistoryLayerService, LocalHistoryLayerService>();
 
+        // SenderService configuration
+        var senderServiceName = configuration.GetSection("SenderService")?.Value ?? "Slack";
+        switch (senderServiceName)
+        {
+            case "Slack":
+                {
+                    services.AddSlackNet(c =>
+                    {
+                        c.UseApiToken(configuration["Slack:BotToken"]!);
+                        c.UseSigningSecret(configuration["Slack:SigningSecret"]!);
+                        c.RegisterEventHandler<AppMention>(ctx => ctx.ServiceProvider().GetRequiredService<AppMentionEventHandler>());
+                    });
+                    services.AddScoped<IMessageSenderService, SlackChatService>();
+                    services.AddScoped<AppMentionEventHandler>();
+                }
+                break;
+            case "Console":
+                {
+                    Console.OutputEncoding = Encoding.UTF8;
+                    services.AddScoped<IMessageSenderService, ConsoleChatService>();
+                }
+           
+                break;
+        }
+        if (configuration.GetValue<bool>("RunGenrateFakeLog") == true)
+        {
+            services.AddHostedService<FakeLogBackgroundService>();
+        }
+        services.AddScoped<IFakeLogGenerateService, FakeLogGenerateService>();
         // Other services
         services.AddScoped<IMentionParserService, MentionParserService>();
+        services.AddKeyedScoped<ILogSourceService, DatadogLogSource>(SourceType.Datadog);
+        services.AddKeyedScoped<ILogSourceService, FolderLogSource>(SourceType.Folder);
+        services.AddScoped<ICompositeLogSource, CompositeLogSource>();
         services.AddScoped<ISummarizerService, SummarizerService>();
-        services.AddKeyedSingleton<ILogSourceService, DatadogLogSource>(SourceType.Datadog);
-        services.AddKeyedSingleton<ILogSourceService, FolderLogSource>(SourceType.Folder);
-        services.AddSingleton<ICompositeLogSource, CompositeLogSource>();
+
 
         return services;
     }
 }
-

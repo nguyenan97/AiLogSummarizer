@@ -329,3 +329,4 @@ Desktop.ini
 
 # JetBrains Rider
 .idea/
+/src/WebApi/Properties/ServiceDependencies/oops-ai - Web Deploy/profile.arm.json

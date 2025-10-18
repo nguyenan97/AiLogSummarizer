@@ -10,6 +10,6 @@ namespace Application.Interfaces
 {
     public interface ICompositeLogSource
     {
-        Task<List<TraceLog>> GetLogsAsync(GetLogModel model);
+        Task<List<TraceLog>> GetLogsAsync(LogQueryContext model);
     }
 }
